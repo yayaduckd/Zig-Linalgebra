@@ -1,0 +1,5 @@
+# Gitignore!
+
+# Zig stuffs
+zig-cache/
+zig-out/
