@@ -1,0 +1,5 @@
+{
+    "[zig]": {
+        "editor.formatOnSave": false
+    }
+}
