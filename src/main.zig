@@ -53,8 +53,8 @@ pub const Matrix = struct {
     m: LASizeType, // Number of rows
     n: LASizeType, // Number of columns
 
-    pub fn zeroes(matrixAllocator: std.mem.Allocator, numOfRows: LASizeType, numOfCols: LASizeType) !Matrix {
-        const matrixSlice: []LAType = try matrixAllocator.alloc(LAType, numOfRows * numOfCols);
+    pub fn zeroes(matrixAllocator: std.mem.Allocator, numOfRows: LASizeType, numOfCols: LASizeType) Matrix {
+        const matrixSlice: []LAType = matrixAllocator.alloc(LAType, numOfRows * numOfCols) catch @panic("... i ate too much memory sorry");
         // Set LAType to all zeroes
         var i: LASizeType = 0;
         while (i < numOfRows * numOfCols) : (i += 1) {
@@ -65,6 +65,25 @@ pub const Matrix = struct {
             .values = matrixSlice,
             .m = numOfRows,
             .n = numOfCols,
+        };
+    }
+
+    pub fn identity(matrixAllocator: std.mem.Allocator, dimension: LASizeType) Matrix {
+        const matrixSlice: []LAType = matrixAllocator.alloc(LAType, dimension * dimension) catch @panic("... i ate too much memory sorry");
+        // Set LAType to all zeroes
+        var i: LASizeType = 0;
+        while (i < dimension * dimension) : (i += 1) {
+            if (i % (dimension + 1) == 0) {
+                matrixSlice[i] = 1;
+            } else {
+                matrixSlice[i] = 0;
+            }
+        }
+
+        return Matrix{
+            .values = matrixSlice,
+            .m = dimension,
+            .n = dimension,
         };
     }
 
@@ -143,7 +162,7 @@ test "basic matrix functionality" {
     var gpallocator = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpallocator.allocator();
 
-    var testMatrix = Matrix.zeroes(allocator, 3, 3) catch unreachable;
+    var testMatrix = Matrix.zeroes(allocator, 3, 3);
 
     try testing.expect(testMatrix.getRowNum() == 3);
     try testing.expect(testMatrix.getColNum() == 3);
@@ -159,7 +178,7 @@ test "get row and column" {
     var gpallocator = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpallocator.allocator();
 
-    var testMatrix = Matrix.zeroes(allocator, 4, 2) catch unreachable;
+    var testMatrix = Matrix.zeroes(allocator, 4, 2);
     try testMatrix.set(1, 1, 1.0);
     try testMatrix.set(1, 2, 2.0);
     try testMatrix.set(2, 1, 3.0);
@@ -208,7 +227,7 @@ pub fn matrixEquals(a: Matrix, b: Matrix) bool {
     while (i <= a.getRowNum()) : (i += 1) {
         var j: LASizeType = 1;
         while (j <= a.getColNum()) : (j += 1) {
-            if (a.get(i, j) catch unreachable != b.get(i, j) catch unreachable) {
+            if (!std.math.approxEqAbs(LAType, (a.get(i, j) catch unreachable), (b.get(i, j)) catch unreachable, 0.005)) {
                 return false;
             }
         }
@@ -223,7 +242,7 @@ pub fn add(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) anyerror!Matrix
     if (A.getColNum() != B.getColNum()) {
         return error.MatrixColSize;
     }
-    var resultMatrix = Matrix.zeroes(allocator, A.getRowNum(), A.getColNum()) catch unreachable;
+    var resultMatrix = Matrix.zeroes(allocator, A.getRowNum(), A.getColNum());
     var i: LASizeType = 1;
     while (i <= A.getRowNum()) : (i += 1) {
         var j: LASizeType = 1;
@@ -249,7 +268,7 @@ pub fn multiply(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) anyerror!M
     if (A.getColNum() != B.getRowNum()) {
         return error.MatrixMismatch;
     }
-    var resultMatrix = Matrix.zeroes(allocator, A.getRowNum(), B.getColNum()) catch unreachable;
+    var resultMatrix = Matrix.zeroes(allocator, A.getRowNum(), B.getColNum());
     var i: LASizeType = 1;
     while (i <= resultMatrix.getRowNum()) : (i += 1) {
         var j: LASizeType = 1;
@@ -264,25 +283,108 @@ pub fn multiply(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) anyerror!M
     return resultMatrix;
 }
 
-test "basic add functionality" {
+pub fn transpose(A: *Matrix, allocator: std.mem.Allocator) Matrix {
+    var AT = Matrix.zeroes(allocator, A.getColNum(), A.getRowNum());
+    var i: LASizeType = 1;
+    while (i <= AT.getRowNum()) : (i += 1) {
+        var j: LASizeType = 1;
+        while (j <= AT.getColNum()) : (j += 1) {
+            AT.set(i, j, A.get(j, i) catch unreachable) catch unreachable;
+        }
+    }
+    return AT;
+}
+
+test "matrix addition" {
     var gpallocator = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpallocator.allocator();
-    var testMatrixA = Matrix.zeroes(allocator, 3, 3) catch unreachable;
+    var testMatrixA = Matrix.zeroes(allocator, 3, 3);
     try testMatrixA.set(2, 2, 1.0);
     try testMatrixA.set(2, 1, 7.6);
     try testMatrixA.set(1, 2, 3.2);
-    var testMatrixB = Matrix.zeroes(allocator, 3, 3) catch unreachable;
+    var testMatrixB = Matrix.zeroes(allocator, 3, 3);
     try testMatrixB.set(2, 2, 1.0);
     try testMatrixB.set(2, 1, 6.7);
     try testMatrixB.set(1, 1, 9.6);
 
     var resultMatrix = try add(&testMatrixA, &testMatrixB, allocator);
     
-    var expectedMatrix = Matrix.zeroes(allocator, 3, 3) catch unreachable;
+    var expectedMatrix = Matrix.zeroes(allocator, 3, 3);
     try expectedMatrix.set(2, 2, 2.0);
     try expectedMatrix.set(2, 1, 14.3);
     try expectedMatrix.set(1, 2, 3.2);
     try expectedMatrix.set(1, 1, 9.6);
     
     try testing.expect(matrixEquals(resultMatrix, expectedMatrix));
+}
+
+test "matrix multiplication" {
+
+    // credit: https://www.khanacademy.org/math/precalculus/x9e81a4f98389efdf:matrices/x9e81a4f98389efdf:multiplying-matrices-by-matrices/e/multiplying_a_matrix_by_a_matrix
+    var gpallocator = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpallocator.allocator();
+
+    var E = Matrix.zeroes(allocator, 2, 2);
+    try E.set(1, 1, 3);
+    try E.set(1, 2, 5);
+    try E.set(2, 1, -1);
+    try E.set(2, 2, 1);
+
+    var A = Matrix.zeroes(allocator, 2, 3);
+    try A.set(1, 1, -2);
+    try A.set(1, 2, 2);
+    try A.set(1, 3, 3);
+    try A.set(2, 1, 3);
+    try A.set(2, 2, 5);
+    try A.set(2, 3, -2);
+
+    var H = Matrix.zeroes(allocator, 2, 3);
+    try H.set(1, 1, 9);
+    try H.set(1, 2, 31);
+    try H.set(1, 3, -1);
+    try H.set(2, 1, 5);
+    try H.set(2, 2, 3);
+    try H.set(2, 3, -5);
+    try testing.expect(matrixEquals(multiply(&E, &A, allocator) catch unreachable, H));
+
+    var A2 = Matrix.zeroes(allocator, 3, 1);
+    try A2.set(1, 1, -1);
+    try A2.set(2, 1, 4);
+    try A2.set(3, 1, 4);
+    var F = Matrix.zeroes(allocator, 1, 2);
+    try F.set(1, 1, 0);
+    try F.set(1, 2, -2);
+    H = Matrix.zeroes(allocator, 3, 2);
+    try H.set(1, 1, 0);
+    try H.set(1, 2, 2);
+    try H.set(2, 1, 0);
+    try H.set(2, 2, -8);
+    try H.set(3, 1, 0);
+    try H.set(3, 2, -8);
+    try testing.expect(matrixEquals(multiply(&A2, &F, allocator) catch unreachable, H));
+    
+
+}
+
+test "matrix transpose" {
+    var gpallocator = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpallocator.allocator();
+    var A = Matrix.zeroes(allocator, 2, 3);
+    try A.set(1, 1, 1);
+    try A.set(1, 2, 2);
+    try A.set(1, 3, 3);
+    try A.set(2, 1, 4);
+    try A.set(2, 2, 5);
+    try A.set(2, 3, 6);
+    var AT = Matrix.zeroes(allocator, 3, 2);
+    try AT.set(1, 1, 1);
+    try AT.set(1, 2, 4);
+    try AT.set(2, 1, 2);
+    try AT.set(2, 2, 5);
+    try AT.set(3, 1, 3);
+    try AT.set(3, 2, 6);
+    try testing.expect(matrixEquals(transpose(&A, allocator), AT));
+
+    var B = Matrix.identity(allocator, 700);
+    try testing.expect(matrixEquals(B, transpose(&B, allocator)));
 }
