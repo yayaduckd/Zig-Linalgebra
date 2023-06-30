@@ -11,10 +11,6 @@ pub fn printSeparatorLine(writer: anytype) !void {
 }
 
 pub fn run() anyerror!void {
-
-    // var identityMatrix5 = la.Matrix.identity(allocator, 5);
-    // try identityMatrix5.print(stdout);
-
     // var array = [_]la.LAType{ 1,  2,  3,  4,  5,  6,
     //                           7,  8,  9, 10, 11, 12,
     //                          13, 14, 15, 16, 17, 18,
@@ -33,16 +29,28 @@ pub fn run() anyerror!void {
     // var A = la.Matrix.fromSlice(allocator, 4, 4, matBase);
 
 
-    var array = [_]la.LAType{1, 2, -1,
-                             2, -1, 3,
-                             3,  1, 2};
+    // var array = [_]la.LAType{1, 2, -1,
+    //                          2, -1, 3,
+    //                          3,  1, 2};
+    // var matBase = array[0..];
+    // var A = la.Matrix.fromSlice(allocator, 3, 3, matBase);
+
+    // with inverse example
+    var array = [_]la.LAType{1, -1, 0,
+                            1, 0, -1,
+                            2,  3, -4};
     var matBase = array[0..];
     var A = la.Matrix.fromSlice(allocator, 3, 3, matBase);
+
+    // var A = la.augmentWithIdentity(&Abase, allocator);
+
+
     defer A.deinit(allocator);
     try A.print(stdout);
     try printSeparatorLine(stdout);
     // la.gaussElim(&A, allocator);
-    la.gaussJordanElim(&A, allocator);
+    // la.gaussJordanElimAugmented(&A, 3, allocator);
+    A = la.invert(&A, allocator);
     try A.print(stdout);
 
     // var testMatrixB = la.Matrix.zeroes(allocator, 2, 4);

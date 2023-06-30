@@ -96,6 +96,7 @@ pub const Matrix = struct {
 
     pub fn print(self: Self, writer: anytype) anyerror!void {
         var m: u8 = 1;
+        try writer.print("-------------------------------\n", .{});
         while (m <= self.getRowNum()) : (m += 1) {
             var n: u8 = 1;
             while (n <= self.getColNum()) : (n += 1) {
@@ -103,6 +104,7 @@ pub const Matrix = struct {
             }
             try writer.print("\n", .{});
         }
+        try writer.print("-------------------------------\n", .{});
     }
 };
 
@@ -151,6 +153,59 @@ pub fn matrixEquals(a: *const Matrix, b: *const Matrix) bool {
     return true;
 }
 
+pub fn augmentWithIdentity(A: *Matrix, allocator: std.mem.Allocator) Matrix {
+    if (A.getColNum() != A.getRowNum()) {
+        @panic("Matrix now square");
+    }
+    var newMatrix = Matrix.zeroes(allocator, A.getRowNum(), A.getColNum() * 2);
+
+    var matrixIterator: LASizeType = 0;
+
+    var i: LASizeType = 1;
+    while (i <= newMatrix.getRowNum()) : (i += 1) {
+        var j: LASizeType = 1;
+        while (j <= A.getColNum()) : (j += 1) {
+            newMatrix.values[matrixIterator] = A.get(i, j);
+            matrixIterator += 1;
+        }
+        j = 1;
+        while (j <= A.getColNum()) : (j += 1) {
+            if (j == i) {
+                newMatrix.values[matrixIterator] = 1;
+            }
+            // Otherwise the values are already zero
+            matrixIterator += 1;
+        }
+    }
+    return newMatrix;
+}
+
+// Inverts the Matrix using Gauss-Jordan elimination.
+pub fn invert(A: *Matrix, allocator:std.mem.Allocator) Matrix {
+    if (A.getRowNum() != A.getColNum()) {
+        @panic("Matrix is not square - no inverse exists");
+    }
+
+    var augmentedA = augmentWithIdentity(A, allocator);
+    gaussJordanElimAugmented(&augmentedA, A.getRowNum(), allocator);
+    defer augmentedA.deinit(allocator);
+    if (augmentedA.values[augmentedA.values.len - 1] == 0) {
+        @panic("Matrix is singular - no inverse exists");
+    }
+
+    var invertedA = Matrix.zeroes(allocator, A.getRowNum(), A.getRowNum());
+    var inverseIterator: LASizeType = 0;
+    var augmentedIterator: LASizeType = invertedA.getColNum();
+    while (inverseIterator < invertedA.values.len) : (inverseIterator += 1) {
+        invertedA.values[inverseIterator] = augmentedA.values[augmentedIterator];
+        if (inverseIterator + 1 % invertedA.getRowNum() == 0) {
+            augmentedIterator += invertedA.getRowNum();
+        }
+        augmentedIterator += 1;
+    }
+    return invertedA;
+}
+
 pub fn add(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) anyerror!Matrix {
     if (A.getRowNum() != B.getRowNum()) {
         return error.MatrixRowSize;
@@ -168,6 +223,25 @@ pub fn add(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) anyerror!Matrix
     }
     return resultMatrix;
 }
+
+pub fn subtract(A: *Matrix, B: *Matrix, allocator: std.mem.Allocator) Matrix {
+    if (A.getRowNum() != B.getRowNum()) {
+        @panic("MatrixRowSizeError");
+    }
+    if (A.getColNum() != B.getColNum()) {
+        @panic("MatrixColSizeError");
+    }
+    var resultMatrix = Matrix.zeroes(allocator, A.getRowNum(), A.getColNum());
+    var i: LASizeType = 1;
+    while (i <= A.getRowNum()) : (i += 1) {
+        var j: LASizeType = 1;
+        while (j <= A.getColNum()) : (j += 1) {
+            resultMatrix.set(i, j, A.get(i, j) - B.get(i, j));
+        }
+    }
+    return resultMatrix;
+}
+
 
 pub fn dot(a: *Matrix, b: *Matrix) LAType {
     if ((a.getRowNum() != 1) or (b.getRowNum() != 1)) {
@@ -224,9 +298,9 @@ pub fn scalarMultiply(A: *Matrix, scalar: LAType) void {
     }
 }
 
-fn findPivotIndex(A: *Matrix, row: LASizeType) LASizeType {
+fn findPivotIndexAugmented(A: *Matrix, row: LASizeType, augmentLinePos: LASizeType) LASizeType {
     var i: LASizeType = 1;
-    while (i <= A.getColNum()) : (i += 1) {
+    while (i <= augmentLinePos) : (i += 1) {
         const pivot = A.get(row, i);
         if (pivot != 0) {
             return i;
@@ -235,12 +309,16 @@ fn findPivotIndex(A: *Matrix, row: LASizeType) LASizeType {
     return i - 1;
 }
 
-pub fn reduceBySubtraction(A: *Matrix, firstRowNum: LASizeType, allocator: std.mem.Allocator) void {
+fn findPivotIndex(A: *Matrix, row: LASizeType) LASizeType {
+    return findPivotIndexAugmented(A, row, A.getColNum());
+}
+
+fn reduceBySubtraction(A: *Matrix, firstRowNum: LASizeType, augmentLinePos: LASizeType, allocator: std.mem.Allocator) void {
     var i: LASizeType = firstRowNum + 1;
     var pivotRow: Matrix = getRow(A, firstRowNum, allocator);
     defer pivotRow.deinit(allocator);
     
-    var pivotIndex = findPivotIndex(&pivotRow, 1);
+    var pivotIndex = findPivotIndexAugmented(&pivotRow, 1, augmentLinePos);
     var pivot = pivotRow.get(1, pivotIndex);
     if (pivot == 0) {
         return;
@@ -270,21 +348,25 @@ pub fn reduceBySubtraction(A: *Matrix, firstRowNum: LASizeType, allocator: std.m
 }
 
 // Use Gaussian Elimination to derive the row echelon form.
-pub fn gaussElim(A: *Matrix, allocator: std.mem.Allocator) void {
+pub fn gaussElimAugmented(A: *Matrix, augmentLinePos: LASizeType, allocator: std.mem.Allocator) void {
     var i: LASizeType = 1;
     while (i <= A.getRowNum()) : (i += 1) {
-        reduceBySubtraction(A, i, allocator);
+        reduceBySubtraction(A, i, augmentLinePos, allocator);
     }
 }
 
-fn reduceUp(A: *Matrix, startRow: LASizeType, allocator: std.mem.Allocator) void {
-    const pivotIndex = findPivotIndex(A, startRow);
+pub fn gaussElim(A: *Matrix, allocator: std.mem.Allocator) void {
+    gaussElimAugmented(A, A.getColNum(), allocator);
+}
+
+fn reduceUp(A: *Matrix, startRow: LASizeType, augmentLinePos: LASizeType, allocator: std.mem.Allocator) void {
+    const pivotIndex = findPivotIndexAugmented(A, startRow, augmentLinePos);
     var i: LASizeType = startRow - 1;
     while (i >= 1) : (i -= 1) {
         var pivotRow: Matrix = getRow(A, startRow, allocator);
         defer pivotRow.deinit(allocator);
         scalarMultiply(&pivotRow, A.get(i, pivotIndex));
-        var j: LASizeType = 1;
+        var j: LASizeType = pivotIndex;
         while (j <= A.getColNum()) : (j += 1) {
             const newValue: LAType = A.get(i, j) - pivotRow.get(1, j);
             A.set(i, j, newValue);
@@ -292,12 +374,16 @@ fn reduceUp(A: *Matrix, startRow: LASizeType, allocator: std.mem.Allocator) void
     }
 }
 
-pub fn gaussJordanElim(A: *Matrix, allocator: std.mem.Allocator) void {
-    gaussElim(A, allocator);
+pub fn gaussJordanElimAugmented(A: *Matrix, augmentLinePos: LASizeType, allocator: std.mem.Allocator) void {
+    gaussElimAugmented(A, augmentLinePos, allocator);
     var i: LASizeType = A.getRowNum();
     while (i > 1) : (i -= 1) {
-        reduceUp(A, i, allocator);
+        reduceUp(A, i, augmentLinePos, allocator);
     }
+}
+
+pub fn gaussJordanElim(A: *Matrix, allocator: std.mem.Allocator) void {
+    gaussJordanElimAugmented(A, A.getColNum(), allocator);
 }
 
 
