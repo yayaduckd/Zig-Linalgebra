@@ -5,6 +5,8 @@ pub const LAType = f64;
 pub const LASizeType = usize;
 pub const equalityTolerance: LAType = 0.000005; 
 
+const stdout = std.io.getStdOut().writer();
+
 pub const Matrix = struct {
 
     const Self = @This();
@@ -97,8 +99,6 @@ pub const Matrix = struct {
         while (m <= self.getRowNum()) : (m += 1) {
             var n: u8 = 1;
             while (n <= self.getColNum()) : (n += 1) {
-
-                // _ = try std.fmt.bufPrint(&buffer, "{:2}", .{self.get(m, n) catch unreachable});
                 try writer.print("{d:.2} ", .{self.get(m, n)});
             }
             try writer.print("\n", .{});
@@ -224,17 +224,33 @@ pub fn scalarMultiply(A: *Matrix, scalar: LAType) void {
     }
 }
 
+fn findPivotIndex(A: *Matrix, row: LASizeType) LASizeType {
+    var i: LASizeType = 1;
+    while (i <= A.getColNum()) : (i += 1) {
+        const pivot = A.get(row, i);
+        if (pivot != 0) {
+            return i;
+        }
+    }
+    return i - 1;
+}
+
 pub fn reduceBySubtraction(A: *Matrix, firstRowNum: LASizeType, allocator: std.mem.Allocator) void {
     var i: LASizeType = firstRowNum + 1;
+    var pivotRow: Matrix = getRow(A, firstRowNum, allocator);
+    defer pivotRow.deinit(allocator);
+    
+    var pivotIndex = findPivotIndex(&pivotRow, 1);
+    var pivot = pivotRow.get(1, pivotIndex);
+    if (pivot == 0) {
+        return;
+    }
+
+    var normalizeFactor: LAType = 1 / pivot;
     while (i <= A.getRowNum()) : (i += 1) {
         var firstRow: Matrix = getRow(A, firstRowNum, allocator);
         defer firstRow.deinit(allocator);
-        const rowValueOne: LAType = (A.get(i, firstRowNum));
-        const pivot = firstRow.get(1, firstRowNum);
-        if (pivot == 0) {
-            i += 1;
-            continue;
-        }
+        const rowValueOne: LAType = A.get(i, pivotIndex);
         const scalingFactor: LAType = (rowValueOne / pivot);
         scalarMultiply(&firstRow, scalingFactor);
         var j: LASizeType = 1;
@@ -243,13 +259,44 @@ pub fn reduceBySubtraction(A: *Matrix, firstRowNum: LASizeType, allocator: std.m
             A.set(i, j, newVal);
         }
     }
+    // A.print(stdout) catch unreachable;
+    // stdout.print("-------------------------------\n", .{}) catch unreachable;
+    scalarMultiply(&pivotRow, normalizeFactor);
+    var j: LASizeType = 1;
+    while (j <= A.getColNum()) : (j += 1) {
+        const newVal: LAType = pivotRow.get(1, j);
+        A.set(firstRowNum, j, newVal);
+    }
 }
 
 // Use Gaussian Elimination to derive the row echelon form.
-pub fn rowReduce(A: *Matrix, allocator: std.mem.Allocator) void {
+pub fn gaussElim(A: *Matrix, allocator: std.mem.Allocator) void {
     var i: LASizeType = 1;
-    while (i < A.getRowNum()) : (i += 1) {
+    while (i <= A.getRowNum()) : (i += 1) {
         reduceBySubtraction(A, i, allocator);
+    }
+}
+
+fn reduceUp(A: *Matrix, startRow: LASizeType, allocator: std.mem.Allocator) void {
+    const pivotIndex = findPivotIndex(A, startRow);
+    var i: LASizeType = startRow - 1;
+    while (i >= 1) : (i -= 1) {
+        var pivotRow: Matrix = getRow(A, startRow, allocator);
+        defer pivotRow.deinit(allocator);
+        scalarMultiply(&pivotRow, A.get(i, pivotIndex));
+        var j: LASizeType = 1;
+        while (j <= A.getColNum()) : (j += 1) {
+            const newValue: LAType = A.get(i, j) - pivotRow.get(1, j);
+            A.set(i, j, newValue);
+        }
+    }
+}
+
+pub fn gaussJordanElim(A: *Matrix, allocator: std.mem.Allocator) void {
+    gaussElim(A, allocator);
+    var i: LASizeType = A.getRowNum();
+    while (i > 1) : (i -= 1) {
+        reduceUp(A, i, allocator);
     }
 }
 

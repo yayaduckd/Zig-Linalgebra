@@ -22,44 +22,42 @@ pub fn run() anyerror!void {
     //                          25, 26, 27, 28, 29, 30,
     //                          31, 32, 33, 34, 35, 36 };
     // var matBase = array[0..];
-
-
     // var A = la.Matrix.fromSlice(allocator, 6, 6, matBase);
 
-    // nonsingular example
+    // // nonsingular example
     // var array = [_]la.LAType{2, 5, 0, 8,
     //                          1, 4, 2, 6,
     //                          7, 8, 9, 3,
     //                          1, 5, 7, 8};
     // var matBase = array[0..];
-
-
     // var A = la.Matrix.fromSlice(allocator, 4, 4, matBase);
+
+
     var array = [_]la.LAType{1, 2, -1,
                              2, -1, 3,
                              3,  1, 2};
     var matBase = array[0..];
-
-
     var A = la.Matrix.fromSlice(allocator, 3, 3, matBase);
     defer A.deinit(allocator);
-    
     try A.print(stdout);
-
     try printSeparatorLine(stdout);
-    
-    la.rowReduce(&A, allocator);
+    // la.gaussElim(&A, allocator);
+    la.gaussJordanElim(&A, allocator);
     try A.print(stdout);
 
-    // var testMatrixB = la.Matrix.zeroes(allocator, 2, 4) catch unreachable;
-    // try testMatrixB.set(1, 1, 1.0);
-    // try testMatrixB.set(1, 2, 2.0);
-    // try testMatrixB.set(1, 3, 3.0);
-    // try testMatrixB.set(1, 4, 4.0);
-    // try testMatrixB.set(2, 1, 5.0);
-    // try testMatrixB.set(2, 2, 6.0);
-    // try testMatrixB.set(2, 3, 7.0);
-    // try testMatrixB.set(2, 4, 8.0);
+    // var testMatrixB = la.Matrix.zeroes(allocator, 2, 4);
+    // testMatrixB.set(1, 1, 1.0);
+    // testMatrixB.set(1, 2, 2.0);
+    // testMatrixB.set(1, 3, 3.0);
+    // testMatrixB.set(1, 4, 4.0);
+    // testMatrixB.set(2, 1, 5.0);
+    // testMatrixB.set(2, 2, 6.0);
+    // testMatrixB.set(2, 3, 7.0);
+    // testMatrixB.set(2, 4, 8.0);
+    // try testMatrixB.print(stdout);
+    // try printSeparatorLine(stdout);
+    // la.gaussElim(&testMatrixB, allocator);
+    // try testMatrixB.print(stdout);
 
     // var resultMatrix = la.multiply(&testMatrixA, &testMatrixB, allocator) catch unreachable;
     // try testMatrixA.print(stdout);
@@ -82,7 +80,7 @@ pub fn run() anyerror!void {
 
 pub fn main() !void {
     try run();
-    if (gpallocator.detectLeaks()) {
-        std.log.warn("😡😡😡😡😡😡😡 grr try not leaking next time", .{});
-    }
+    // if (gpallocator.detectLeaks()) {
+    //     std.log.warn("😡😡😡😡😡😡😡 grr try not leaking next time", .{});
+    // }
 }
