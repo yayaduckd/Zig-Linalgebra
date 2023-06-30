@@ -3,9 +3,9 @@
 
 ## A haiku describing the state of the repo
 
-> Why does this exist?
-> This dumpster fire burns bright.
-> I'm just here to learn.
+> Why does this exist?  
+This dumpster fire burns bright.  
+I'm just here to learn.
 
 ## But actually, why?
 Well, the truth is that as of writing this, I have an exam in less than 5 days. What better way to learn linear algebra and deeply understand what each operation does analytically than implement algorithms to do it all from scratch? And while I'm on it, why not learn a new programming language? Zig seems pretty fun.
