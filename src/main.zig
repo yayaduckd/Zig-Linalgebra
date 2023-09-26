@@ -115,7 +115,7 @@ pub fn getRow(A: *Matrix, rowNum: LASizeType, allocator: std.mem.Allocator) Matr
     }
 
     var row = Matrix.zeroes(allocator, 1, A.getColNum());    
-    for (row.values) |*value, i| {
+    for (row.values, 0..) |*value, i| {
         value.* = A.get(rowNum, i + 1);
     }
     return row;
@@ -127,7 +127,7 @@ pub fn getCol(A: *Matrix, colNum: LASizeType, allocator: std.mem.Allocator) Matr
     }
 
     var col = Matrix.zeroes(allocator, 1, A.getRowNum());
-    for (col.values) |*value, i| {
+    for (col.values, 0..) |*value, i| {
         value.* = A.get(i + 1, colNum);
     }
     return col;
@@ -251,7 +251,7 @@ pub fn dot(a: *Matrix, b: *Matrix) LAType {
         @panic("a and b are not the same length");
     }
     var result: LAType = 0;
-    for (a.values) |value, i| {
+    for (a.values, 0..) |value, i| {
         result += (value * b.get(1, i + 1));
     }
     return result;
