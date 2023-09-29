@@ -6,13 +6,10 @@ pub fn build(b: *std.build.Builder) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const lib = b.addStaticLibrary(.{
-        .name = "Linalgebra",
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
+    _ = b.addModule("Linalgebra", .{
+        .source_file = .{ .path = "src/main.zig" },
+        .dependencies = &[_]std.Build.ModuleDependency{},
     });
-    b.installArtifact(lib);
 
     const main_tests = b.addTest(.{
         .root_source_file = .{ .path = "src/main.zig" },
